@@ -44,7 +44,7 @@ Please perform the following steps sequentially. Use your bash/terminal tools to
    - Install `cloudflared` (Cloudflare Quick Tunnels) on this machine if it doesn't exist.
    - Start a background cloudflared tunnel pointing to `http://localhost:8000`.
    - Extract the `trycloudflare.com` URL from the tunnel logs.
-   - Update `WEBHOOK_URL_OVERRIDE` in `docker/docker-compose.override.yml` to point to `https://<your-cloudflare-url>/functions/v1/webhook-wsender`.
+   - Update `WEBHOOK_URL_OVERRIDE` in `docker/docker-compose.override.yml` to point to `https://<your-cloudflare-url>/functions/v1/webhook-wsender_via_cloth`.
    - Restart the `supabase-edge-functions` container to apply the new environment variable.
 
 5. **Frontend Setup:**

@@ -11,16 +11,16 @@ the Lovable AI Gateway and returns text. It touches no database and stores nothi
 │        │ supabase-js                                 │
 │  self-hosted Supabase                                │
 │    postgres + auth + kong + edge-runtime             │
-│      ├ webhook-wsender ─► message_queue              │
-│      ├ process-message  (queue drainer, cron)        │
-│      ├ ai-chat  ── builds prompt, quotas, orders ────┼──► Lovable ai-generate ──► AI Gateway
-│      ├ send-whatsapp ──► WAHA / Wsender              │
-│      ├ media-storage ──► MinIO                       │
-│      └ send-push ──────► Firebase                    │
+│      ├ webhook-wsender_via_cloth ─► message_queue    │
+│      ├ process-message_via_cloth (queue drainer)     │
+│      ├ ai-chat_via_cloth ── builds prompt, quotas ───┼──► Lovable ai-generate ──► AI Gateway
+│      ├ send-whatsapp_via_cloth ──► WAHA / Wsender    │
+│      ├ media-storage_via_cloth ──► MinIO             │
+│      └ send-push_via_cloth ──────► Firebase          │
 └──────────────────────────────────────────────────────┘
 ```
 
-`ai-chat` stays local on purpose: catalog, FAQs, plan quotas, order extraction and
+`ai-chat_via_cloth` stays local on purpose: catalog, FAQs, plan quotas, order extraction and
 `ai_usage_logs` never leave your database. The prompt, model
 (`google/gemini-3-flash-preview`) and `max_tokens` (500) are byte-identical to the
 Lovable-hosted version, so reply quality is unchanged.
@@ -31,8 +31,9 @@ Lovable-hosted version, so reply quality is unchanged.
 db/01_schema.sql        full public schema: tables, enums, RLS, GRANTs, functions, triggers
 db/02_seed.sql          plan limits + first-admin template (no tenant data — clean start)
 db/03_cron.sql          pg_cron jobs (queue drainer, follow-ups)
-supabase/functions/     all 12 edge functions (ai-generate is NOT here — it lives on Lovable)
-frontend/               the full dashboard, including super-admin and billing pages
+db/via_clothing_schema.sql  exact duplicate schema for via_clothing
+supabase/functions/     all edge functions with _via_cloth suffix
+frontend/               the full dashboard, configured to via_clothing schema
 .env.example            every variable, split by process
 ```
 
@@ -45,6 +46,7 @@ frontend/               the full dashboard, including super-admin and billing pa
    ```bash
    psql "$DB_URL" -f db/01_schema.sql
    psql "$DB_URL" -f db/02_seed.sql
+   psql "$DB_URL" -f db/via_clothing_schema.sql
    ```
 3. **Auth**: disable public sign-ups (`GOTRUE_DISABLE_SIGNUP=true`) — this product is
    login-only. Create your first user in Studio, then run the commented block at the
@@ -54,7 +56,7 @@ frontend/               the full dashboard, including super-admin and billing pa
    code, so run the runtime with `--no-verify-jwt`.
 5. **Cron**: fill in the placeholders in `db/03_cron.sql` and run it.
 6. **WAHA**: point its webhook at
-   `http://<your-host>:8000/functions/v1/webhook-wsender`.
+   `http://<your-host>:8000/functions/v1/webhook-wsender_via_cloth`.
 7. **MinIO**: one public bucket per business, named `biz-<user_id>`; `media-storage`
    creates them on demand.
 8. **Frontend**

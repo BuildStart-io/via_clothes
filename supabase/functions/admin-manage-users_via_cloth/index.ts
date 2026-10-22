@@ -15,7 +15,8 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const schema = Deno.env.get("SUPABASE_SCHEMA") || "via_clothing";
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema } });
 
     // Verify caller is super_admin
     const authHeader = req.headers.get("Authorization");
@@ -61,7 +62,7 @@ serve(async (req) => {
     console.log(`Admin action: ${action} by ${caller.id}`);
 
     const triggerCrmSync = () => {
-      fetch(`${supabaseUrl}/functions/v1/sync-usage-crm-global`, {
+      fetch(`${supabaseUrl}/functions/v1/sync-usage-crm-global_via_cloth`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${supabaseAnonKey}`, "Content-Type": "application/json" }
       }).catch(e => console.error("CRM sync trigger failed", e));

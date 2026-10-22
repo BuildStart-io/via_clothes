@@ -94,9 +94,11 @@ serve(async (req) => {
     }
 
     // Get all device tokens for this user
+    const schema = Deno.env.get("SUPABASE_SCHEMA") || "via_clothing";
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { db: { schema } }
     );
 
     const { data: tokens, error } = await supabaseAdmin

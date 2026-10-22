@@ -330,7 +330,7 @@ export default function Conversations() {
       if (sessionError) throw sessionError;
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-whatsapp`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-whatsapp_via_cloth`,
         {
           method: "POST",
           headers: {

@@ -81,7 +81,8 @@ async function resolveOwner(req: Request): Promise<{ ownerId: string; userId: st
   const userId = (data as any)?.claims?.sub;
   if (error || !userId) return null;
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+  const schema = Deno.env.get("SUPABASE_SCHEMA") || "via_clothing";
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY, { db: { schema } });
   const { data: staff } = await admin
     .from("staff_accounts")
     .select("owner_id")

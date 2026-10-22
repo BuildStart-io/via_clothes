@@ -19,4 +19,32 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_REGION: ${MINIO_REGION}
       FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
-      WEBHOOK_URL_OVERRIDE: "https://regards-translate-adventures-pine.trycloudflare.com/functions/v1/webhook-wsender"
+      WEBHOOK_URL_OVERRIDE: "https://tsunami-valuation-satisfy-mins.trycloudflare.com/functions/v1/webhook-wsender_via_cloth"
+      SUPABASE_SCHEMA: "via_clothing"
+
+  waha:
+    container_name: waha
+    image: devlikeapro/waha
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      WHATSAPP_API_KEY: ${WAHA_API_KEY:-buildstart_waha_api_secr3t_123}
+      WHATSAPP_DEFAULT_ENGINE: WEBJS
+
+  minio:
+    container_name: supabase-minio
+    image: elestio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-supa-storage}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-secret1234}
+    volumes:
+      - minio-data:/data
+
+volumes:
+  minio-data:

@@ -25,7 +25,7 @@ The `.env` file on your laptop currently has default passwords. **You must chang
 ## 4. WhatsApp Webhook Configuration
 Currently, your WhatsApp webhook relies on a temporary tunnel (`WEBHOOK_URL_OVERRIDE`).
 * In production, remove the override entirely or point it to your actual domain:
-  `WEBHOOK_URL_OVERRIDE="https://api.yourdomain.com/functions/v1/webhook-wsender"`
+  `WEBHOOK_URL_OVERRIDE="https://api.yourdomain.com/functions/v1/webhook-wsender_via_cloth"`
 * Ensure the WAHA server can reach this URL without being blocked by firewalls.
 
 ## 5. Hide Supabase Studio

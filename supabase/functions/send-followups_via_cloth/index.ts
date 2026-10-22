@@ -58,7 +58,8 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, serviceKey);
+  const schema = Deno.env.get("SUPABASE_SCHEMA") || "via_clothing";
+  const supabase = createClient(supabaseUrl, serviceKey, { db: { schema } });
 
   const summary: Record<string, unknown>[] = [];
 
@@ -239,7 +240,7 @@ Deno.serve(async (req) => {
         }
 
         try {
-          const res = await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
+          const res = await fetch(`${supabaseUrl}/functions/v1/send-whatsapp_via_cloth`, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${serviceKey}`,
