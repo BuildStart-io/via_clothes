@@ -280,11 +280,11 @@ async function processMessage(
   mark("history_start");
   const { data: conversationHistory } = await supabase
     .from("conversations")
-    .select("message, direction, created_at")
+    .select("message, direction, created_at, metadata")
     .eq("phone_number", phoneNumber)
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(20);
   mark("history_end");
 
   // 6. Call AI chat with timeout

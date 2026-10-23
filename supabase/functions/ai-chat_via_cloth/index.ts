@@ -188,6 +188,34 @@ serve(async (req) => {
       `[FAQ_ID:${f.id}] Q: ${f.question}\nA: ${f.answer}${f.products?.name ? ` (Related to: ${f.products.name})` : ""}`
     ).join("\n\n");
 
+    // 1. Identify all product image URLs already sent to this customer in this conversation
+    const alreadySentImageUrls = new Set<string>();
+
+    const { data: priorOutbound } = await supabase
+      .from("conversations")
+      .select("metadata")
+      .eq("user_id", userId)
+      .eq("phone_number", phoneNumber)
+      .eq("direction", "outbound")
+      .not("metadata", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    for (const row of priorOutbound || []) {
+      const urls = (row as any)?.metadata?.imageUrls;
+      if (Array.isArray(urls)) {
+        for (const u of urls) {
+          if (typeof u === "string" && u.trim()) alreadySentImageUrls.add(u.trim());
+        }
+      }
+    }
+
+    // Match which products have already had their images delivered
+    const productsWithSentImages = products.filter((p: any) => {
+      const pImages: string[] = Array.isArray(p.images) ? p.images : (p.image_url ? [p.image_url] : []);
+      return pImages.length > 0 && pImages.some((u: string) => alreadySentImageUrls.has(u));
+    });
+
     // Get list of tracked FAQ IDs
     const trackedFaqIds = faqs.filter(f => f.is_tracked).map(f => f.id);
 
@@ -201,8 +229,9 @@ WORKFLOW & PRD REQUIREMENTS (STRICT STEP-BY-STEP SEQUENCE):
 - Step 1 (Welcome Message): Introduce Via Clothing Store as an online ladies' clothing store. (Sent automatically on customer's first contact).
 - Step 2 (Language Selection via Poll): An interactive WhatsApp poll is sent immediately after the welcome message with options "English" and "සිංහල". When the customer selects a language from the poll or mentions English/Sinhala, warmly acknowledge their choice and immediately proceed to Step 3 in their chosen language. Do NOT ask for language selection in plain text again. If the customer ignores the poll and asks about a product, reply in their language and continue the workflow.
 - Step 3 (Product Introduction): Present available ladies' clothing items from the approved catalogue below in clean text only (including product names, codes, descriptions, prices, available colours, and sizes) in the chosen language. DO NOT send any product images at this step.
-- Step 4 (Requirement Identification): Ask the customer which item they wish to order, allowing them to refer to a Facebook post, product code, or image/name. Do NOT send any product images at this step.
-- Step 5 (Detail & Size Chart Delivery): Only after the customer selects or mentions the specific product name or code, provide that specific product's image(s), price, available options, and size chart details before prompting the customer to confirm their required size. Send images ONLY ONCE here when the customer specifies their product choice.
+- Step 4 (Requirement Identification): Ask the customer which item they wish to order, allowing them to refer to a Facebook post, product code, or image/name.
+  * If the customer mentions a general name that matches multiple products or designs (for example, "blouse and pants" which has both VIA001 and VIA002): present the available designs or codes and share their photos so the customer can view the options and choose which design they want.
+- Step 5 (Detail & Size Chart Delivery): When the customer specifies their chosen product code or unique design (e.g. "VIA001"), provide that specific product's price, available options (e.g. Full set, Blouse only, Pant only), and size chart details before prompting the customer to confirm their required size. If images for this product have NOT been sent yet, send them. If images for this product were ALREADY delivered earlier (e.g. during design presentation), DO NOT send them again.
 - Step 6 (Item Collection): Collect and record the selected product name or code, colour, size, and quantity, while checking against the latest availability. Do NOT send any product images.
 - Step 7 (Customer Data Collection): Request the customer's full name, contact number, complete delivery address, and city or district, ensuring you only ask for missing information. Do NOT send any product images.
 - Step 8 (Payment & Fee Explanation): Explain that the payment method is strictly Cash on Delivery (COD) and delivery is completely FREE (LKR 0). Do NOT send any product images.
@@ -273,13 +302,24 @@ STAFF CONTACT NUMBER:
 - Whenever a customer asks about unlisted items, custom requests, human support, or information not in the product table, share this number directly with them.` : ""}
 
 PRODUCT IMAGES (STRICT RULES):
-- ONLY SEND IMAGES AFTER CUSTOMER SELECTS OR MENTIONS PRODUCT NAME: You must ONLY include <IMAGE_URL> tags right after the customer selects or mentions a specific product name or code, or when the customer explicitly asks to see product photos/images.
-- NO NEED TO SEND IMAGES EVERY TIME: Once product images have been sent for a selected item, DO NOT send images of the product again in subsequent replies. Never send images on every message!
-- DO NOT send images when presenting or introducing the product catalogue (Step 3). Catalog introduction must be text only.
-- DO NOT send images when the customer is answering questions about size (e.g. "Small", "M", "L"), colour, quantity, customer name, phone number, delivery address, payment method, or confirming an order ("yes", "confirm", "ok").
-- If the customer explicitly asks to see photos/images again (e.g. "send photos again", "can I see pictures?"), only then include the <IMAGE_URL> tags for that specific product.
-- When sending images for the selected product, include ALL the image URLs for that specific product in separate <IMAGE_URL>url</IMAGE_URL> tags at the very END of your response.
+- ONLY SEND ONCE PER PRODUCT: Each product's photos/images must strictly be sent ONLY ONCE in the entire conversation. Once images for a product or design have been delivered to the customer, NEVER send images for that product again.
+- PRESENTING DESIGNS: When a customer mentions or asks about a product category with multiple designs (for example, "blouse and pants" which has both VIA001 and VIA002), you may share the photos of the matching designs so the customer can see them and choose their preferred design. These photos count as delivered and must NOT be sent again on later steps.
+- ONLY SEND PRODUCT IMAGES WHEN RELEVANT: Only include <IMAGE_URL> tags when presenting the requested product(s)/design(s) to the customer, or when the customer explicitly asks to see product photos.
+- NEVER SEND IMAGES on subsequent order collection steps:
+  * Do NOT send images when customer chooses a variant/option (e.g. "Blouse only", "Pant only", "Full set").
+  * Do NOT send images when customer answers questions about size (e.g. "Small", "M", "L", "XL").
+  * Do NOT send images when customer specifies colour or quantity.
+  * Do NOT send images when customer provides name, phone number, city, or delivery address.
+  * Do NOT send images when customer confirms an order ("yes", "confirm", "ok").
+- ONLY resend images if the customer explicitly asks to see pictures again (e.g. "send photos again", "can I see the pictures?").
+- When sending images, include image URLs in separate <IMAGE_URL>url</IMAGE_URL> tags at the very END of your response.
 - Only use image URLs from the product catalog below. Never make up image URLs.
+${productsWithSentImages.length > 0 ? `
+CRITICAL - PRODUCTS WITH PHOTOS/IMAGES ALREADY DELIVERED IN THIS CONVERSATION:
+The customer has ALREADY received photos/images for:
+${productsWithSentImages.map((p: any) => `- ${p.name}`).join("\n")}
+DO NOT include <IMAGE_URL> tags for these products again under ANY circumstance! Each product's images must strictly be sent ONLY ONCE in the conversation.
+` : ""}
 
 PRODUCT VIDEOS:
 - When a customer asks about a specific product that has a video, include the video URL in a <VIDEO_URL>url</VIDEO_URL> tag at the END of your response (after IMAGE_URL if both exist). Only include one video per message.
@@ -321,10 +361,15 @@ CRITICAL SECURITY RULE:
     ];
 
     if (conversationHistory && conversationHistory.length > 0) {
-      for (const msg of conversationHistory as ConversationMessage[]) {
+      for (const msg of conversationHistory as any[]) {
+        let content = msg.message;
+        const msgImgs = msg.metadata?.imageUrls;
+        if (msg.direction === "outbound" && Array.isArray(msgImgs) && msgImgs.length > 0) {
+          content += `\n[Photos for this item were already delivered to customer]`;
+        }
         messages.push({
           role: msg.direction === "inbound" ? "user" : "assistant",
-          content: msg.message,
+          content,
         });
       }
     }
@@ -574,8 +619,7 @@ CRITICAL SECURITY RULE:
 
     // Extract image URLs if present
     const imageUrlMatches = Array.from(responseText.matchAll(/<IMAGE_URL>([\s\S]*?)<\/IMAGE_URL>/g));
-    const imageUrls = imageUrlMatches.map(m => m[1].trim());
-    const imageUrl = imageUrls.length > 0 ? imageUrls[0] : null;
+    let imageUrls = imageUrlMatches.map(m => m[1].trim());
     // Extract video URL if present
     const videoUrlMatch = responseText.match(/<VIDEO_URL>([\s\S]*?)<\/VIDEO_URL>/);
     const videoUrl = videoUrlMatch ? videoUrlMatch[1].trim() : null;
@@ -612,6 +656,23 @@ CRITICAL SECURITY RULE:
     cleanResponse = cleanResponse.replace(/\[FAQ_ID:[^\]]*\]/g, "");
     // Clean up leftover whitespace
     cleanResponse = cleanResponse.replace(/\n{3,}/g, "\n\n").trim();
+
+    // Check if customer explicitly requested to see photos again
+    const userMsgLower = (trimmedMessage || "").toLowerCase();
+    const customerAskedForPhotos = /\b(photo|photos|image|images|pic|pics|picture|pictures|chayaroopa|pinthura|balanna|penwanna)\b/i.test(userMsgLower);
+
+    // Deduplication Safeguard (Strict Once Per Product):
+    // If photos were already sent in this conversation and customer did NOT explicitly ask for photos again,
+    // filter out any already-sent image URLs so customers never receive duplicate product pictures!
+    if (!customerAskedForPhotos && alreadySentImageUrls.size > 0 && imageUrls.length > 0) {
+      const prevCount = imageUrls.length;
+      imageUrls = imageUrls.filter(url => !alreadySentImageUrls.has(url));
+      if (imageUrls.length < prevCount) {
+        console.log(`[ai-chat] Suppressed ${prevCount - imageUrls.length} duplicate product image(s) already sent in this conversation.`);
+      }
+    }
+
+    const imageUrl = imageUrls.length > 0 ? imageUrls[0] : null;
 
     // Log AI usage independently of conversations
     await supabase.from("ai_usage_logs").insert({
