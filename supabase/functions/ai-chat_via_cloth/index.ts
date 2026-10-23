@@ -120,6 +120,21 @@ serve(async (req) => {
     const deliverySettings = settings.find(s => s.key === "delivery_settings")?.value || {};
     const freeDeliveryThreshold = deliverySettings.free_delivery_threshold || 0;
 
+    const staffContact = settings.find(s => s.key === "staff_contact")?.value || {};
+    const rawStaffPhone = staffContact?.phone || settings.find(s => s.key === "staff_number")?.value?.phone || settings.find(s => s.key === "order_notifications")?.value?.phone || "";
+    const staffLabel = staffContact?.label || "our staff";
+
+    let staffNumber = "";
+    if (rawStaffPhone) {
+      let clean = String(rawStaffPhone).replace(/\D/g, "");
+      if (clean.startsWith("0") && clean.length === 10) {
+        clean = "94" + clean.substring(1);
+      } else if (clean.length === 9) {
+        clean = "94" + clean;
+      }
+      staffNumber = clean ? `+${clean}` : String(rawStaffPhone).trim();
+    }
+
     const productCatalog = products.map(p => {
       let line = `- ${p.name}: Base price LKR ${p.price} (${p.product_type})`;
       if (p.product_type === "physical" && p.delivery_price && p.delivery_price > 0) {
@@ -238,7 +253,24 @@ ${(() => {
         }
         return `  Bank: ${paymentInfo.bank_name || "Not configured"}, Account: ${paymentInfo.account_number || "Not configured"}, Name: ${paymentInfo.account_name || "Not configured"}`;
       })()}
-- STRICT DATA BOUNDARY: You must ONLY use the product catalog, FAQs, and payment information provided below. Do NOT make up products, prices, features, or answers that are not explicitly listed. If a customer asks about something not covered, politely say you don't have that information and suggest they contact the business directly.
+- STRICT RULE - DO NOT TELL OR INVENT ANYTHING NOT MENTIONED IN PRODUCTS TABLE:
+  * You must strictly and ONLY use the product information explicitly provided in the PRODUCT CATALOG below.
+  * NEVER tell, claim, invent, assume, or fabricate ANYTHING that is not explicitly mentioned in the products table below.
+  * NEVER make up or guess product details under ANY circumstance:
+    - Do NOT make up unlisted products, designs, items, categories, or variations.
+    - Do NOT make up unlisted prices, discounts, delivery promises, or special deals.
+    - Do NOT make up unlisted sizes, colors, measurements, or fit guides.
+    - Do NOT make up unlisted fabric composition, material quality, or care instructions.
+    - Do NOT assume or guess availability of out-of-stock or unlisted items.
+  * If a customer asks about ANY product, feature, material, policy, or detail that is NOT explicitly stated in the product catalog or FAQs below:
+    - You MUST state clearly, politely, and honestly that you do not have that information.
+    - NEVER guess or provide speculative answers.
+    - YOU MUST direct the customer to contact our staff directly${staffNumber ? ` at ${staffNumber}` : ""}${staffLabel ? ` (${staffLabel})` : ""} for complete information and assistance.
+  * If a customer asks to speak with a human agent, staff member, or manager, immediately provide the staff contact number: ${staffNumber || "our store staff directly"}.
+${staffNumber ? `
+STAFF CONTACT NUMBER:
+- Dedicated Staff WhatsApp / Contact Number: ${staffNumber}${staffLabel ? ` (${staffLabel})` : ""}
+- Whenever a customer asks about unlisted items, custom requests, human support, or information not in the product table, share this number directly with them.` : ""}
 
 PRODUCT IMAGES (STRICT RULES):
 - ONLY SEND IMAGES AFTER CUSTOMER SELECTS OR MENTIONS PRODUCT NAME: You must ONLY include <IMAGE_URL> tags right after the customer selects or mentions a specific product name or code, or when the customer explicitly asks to see product photos/images.

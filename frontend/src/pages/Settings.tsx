@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, MessageSquare, CreditCard, Copy, Check, Smartphone, RefreshCw, Wifi, WifiOff, Plus, Trash2, ArrowUp, ArrowDown, GripVertical, Clock, Lock, X } from "lucide-react";
+import { Loader2, Save, MessageSquare, CreditCard, Copy, Check, Smartphone, RefreshCw, Wifi, WifiOff, Plus, Trash2, ArrowUp, ArrowDown, GripVertical, Clock, Lock, X, PhoneCall } from "lucide-react";
 import WelcomeMediaUpload from "@/components/settings/WelcomeMediaUpload";
 import StaffManager from "@/components/settings/StaffManager";
 import { useStaffAccess } from "@/hooks/useStaffAccess";
@@ -73,6 +73,10 @@ export default function Settings() {
 
   // Delivery Settings
   const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState<number>(0);
+
+  // Staff Contact Number for Chatbot
+  const [staffPhone, setStaffPhone] = useState("");
+  const [staffLabel, setStaffLabel] = useState("");
 
   // Order Notifications
   const [notificationPhone, setNotificationPhone] = useState("");
@@ -175,6 +179,12 @@ export default function Settings() {
           case "delivery_settings":
             setFreeDeliveryThreshold((setting.value as any)?.free_delivery_threshold || 0);
             break;
+          case "staff_contact": {
+            const sVal = setting.value as any;
+            setStaffPhone(sVal?.phone || "");
+            setStaffLabel(sVal?.label || "");
+            break;
+          }
           case "order_followup_message": {
             const fVal = setting.value as any;
             setOrderFollowupMessage(fVal?.text || "");
@@ -570,6 +580,20 @@ export default function Settings() {
     }
     setNotificationPhone(cleanPhone);
     saveSettings("order_notifications", { phone: cleanPhone });
+  };
+
+  const handleSaveStaffContact = () => {
+    let cleanPhone = staffPhone.replace(/\D/g, "");
+    if (cleanPhone.startsWith("0") && cleanPhone.length === 10) {
+      cleanPhone = "94" + cleanPhone.substring(1);
+    } else if (cleanPhone.length === 9) {
+      cleanPhone = "94" + cleanPhone;
+    }
+    setStaffPhone(cleanPhone);
+    saveSettings("staff_contact", {
+      phone: cleanPhone,
+      label: staffLabel.trim() || "Store Staff",
+    });
   };
 
   const handleSaveOrderFollowup = () => {
@@ -1236,6 +1260,55 @@ export default function Settings() {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Staff Contact Number */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PhoneCall className="h-5 w-5" />
+                  Staff Contact Number
+                </CardTitle>
+                <CardDescription>
+                  The WhatsApp chatbot provides this staff number to customers whenever they ask questions not covered in the product catalog, need human assistance, or have custom inquiries.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="staff-phone">Staff WhatsApp / Phone Number</Label>
+                    <Input
+                      id="staff-phone"
+                      value={staffPhone}
+                      onChange={(e) => setStaffPhone(e.target.value)}
+                      placeholder="e.g., 94771234567 or 0771234567"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the phone number with country code. The bot will provide this number directly to customers.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="staff-label">Staff / Department Name (Optional)</Label>
+                    <Input
+                      id="staff-label"
+                      value={staffLabel}
+                      onChange={(e) => setStaffLabel(e.target.value)}
+                      placeholder="e.g., Customer Support / Sales Desk"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Friendly name for your staff or department (default: Store Staff).
+                    </p>
+                  </div>
+                </div>
+                <Button onClick={handleSaveStaffContact} disabled={saving}>
+                  {saving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  Save Staff Number
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="payment" className="space-y-6">
@@ -1383,6 +1456,55 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="staff" className="space-y-6">
+            {/* Primary Staff Contact Number for Chatbot */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PhoneCall className="h-5 w-5" />
+                  Staff Contact Number (Chatbot Customer Support)
+                </CardTitle>
+                <CardDescription>
+                  Configure the primary staff contact number that the WhatsApp bot shares with customers for inquiries beyond the product catalog or when customers need human support
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="staff-tab-phone">Staff WhatsApp / Phone Number</Label>
+                    <Input
+                      id="staff-tab-phone"
+                      value={staffPhone}
+                      onChange={(e) => setStaffPhone(e.target.value)}
+                      placeholder="e.g., 94771234567 or 0771234567"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the phone number with country code. The bot provides this number directly to customers.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="staff-tab-label">Staff / Department Name (Optional)</Label>
+                    <Input
+                      id="staff-tab-label"
+                      value={staffLabel}
+                      onChange={(e) => setStaffLabel(e.target.value)}
+                      placeholder="e.g., Customer Support / Order Desk"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Friendly name for your staff or department (default: Store Staff).
+                    </p>
+                  </div>
+                </div>
+                <Button onClick={handleSaveStaffContact} disabled={saving}>
+                  {saving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  Save Staff Number
+                </Button>
+              </CardContent>
+            </Card>
+
             <StaffManager />
           </TabsContent>
 
