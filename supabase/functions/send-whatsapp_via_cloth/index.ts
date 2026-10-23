@@ -60,11 +60,11 @@ serve(async (req) => {
   }
 
   try {
-    const { to, message, sessionApiKey, imageUrl, mediaUrl, mediaType: explicitType } = await req.json();
+    const { to, message, sessionApiKey, imageUrl, mediaUrl, mediaType: explicitType, poll } = await req.json();
 
-    if (!to || (!message && !imageUrl && !mediaUrl)) {
+    if (!to || (!message && !imageUrl && !mediaUrl && !poll)) {
       return new Response(
-        JSON.stringify({ error: "Missing 'to' or 'message'/'mediaUrl' field" }),
+        JSON.stringify({ error: "Missing 'to' or 'message'/'mediaUrl'/'poll' field" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -75,11 +75,18 @@ serve(async (req) => {
     const url = mediaUrl || imageUrl;
     const detectedType = explicitType || (url ? detectMediaType(url) : null);
 
-    console.log(`Sending WhatsApp via WAHA session=${sessionName} to=${chatId}${url ? ` (${detectedType})` : ""}: ${(message || "").substring(0, 60)}`);
+    console.log(`Sending WhatsApp via WAHA session=${sessionName} to=${chatId}${poll ? ` (poll: ${poll.name})` : url ? ` (${detectedType})` : ""}: ${(message || "").substring(0, 60)}`);
 
     let res: Response;
 
-    if (url) {
+    if (poll) {
+      const pollPayload = {
+        name: poll.name,
+        options: poll.options || [],
+        multipleAnswers: Boolean(poll.multipleAnswers),
+      };
+      res = await wahaFetch("/api/sendPoll", { session: sessionName, chatId, poll: pollPayload });
+    } else if (url) {
       const fileName = filenameFromUrl(url);
       const file = { url, filename: fileName, mimetype: undefined as string | undefined };
       const caption = message || "";

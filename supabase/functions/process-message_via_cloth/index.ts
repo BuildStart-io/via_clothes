@@ -448,10 +448,18 @@ async function handleWelcomeMessage(
   mark("send_start");
   let sentTexts: string[] = [];
 
+  function cleanWelcomeText(text: string): string {
+    if (!text) return "";
+    return text
+      .replace(/\n*🔹?\s*Please (select|choose) your preferred language:[\s\S]*$/i, "")
+      .trim();
+  }
+
   if (welcomeSequence.length > 0) {
     for (const seqItem of welcomeSequence) {
       if (seqItem.type === "text") {
-        const textToSend = seqItem.text || welcomeText;
+        const rawText = seqItem.text || welcomeText;
+        const textToSend = cleanWelcomeText(rawText);
         if (textToSend.trim()) {
           console.log(`[${corrId}] Sending welcome text (sequence)`);
           await sendWhatsApp(supabaseUrl, supabaseServiceKey, phoneNumber, textToSend, null, sessionApiKey);
@@ -463,13 +471,46 @@ async function handleWelcomeMessage(
       }
     }
   } else {
-    if (welcomeText.trim()) {
-      await sendWhatsApp(supabaseUrl, supabaseServiceKey, phoneNumber, welcomeText, null, sessionApiKey);
-      sentTexts.push(welcomeText.trim());
+    const textToSend = cleanWelcomeText(welcomeText);
+    if (textToSend.trim()) {
+      await sendWhatsApp(supabaseUrl, supabaseServiceKey, phoneNumber, textToSend, null, sessionApiKey);
+      sentTexts.push(textToSend.trim());
     }
     for (const mediaUrl of welcomeMediaUrls) {
       await sendWhatsAppMedia(supabaseUrl, supabaseServiceKey, phoneNumber, mediaUrl, sessionApiKey);
     }
+  }
+
+  // Send language selection poll via WAHA immediately after the welcome message
+  const languagePoll = {
+    name: "Please choose your preferred language / කරුණාකර ඔබ කැමති භාෂාව තෝරන්න:",
+    options: ["English", "සිංහල"],
+    multipleAnswers: false,
+  };
+
+  try {
+    console.log(`[${corrId}] Sending language selection poll via WAHA immediately after welcome message`);
+    await sendWhatsAppPoll(supabaseUrl, supabaseServiceKey, phoneNumber, languagePoll, sessionApiKey);
+    await supabase.from("conversations").insert({
+      phone_number: phoneNumber,
+      message: `📊 [Poll: ${languagePoll.name}] Options: ${languagePoll.options.join(", ")}`,
+      direction: "outbound",
+      message_type: "poll",
+      metadata: { type: "language_poll", poll: languagePoll, correlationId: corrId },
+      user_id: userId,
+    });
+  } catch (pollErr) {
+    console.error(`[${corrId}] Failed to send language poll, falling back to text:`, (pollErr as Error).message);
+    const fallbackText = "Please choose your preferred language / කරුණාකර ඔබ කැමති භාෂාව තෝරන්න:\n1. English\n2. සිංහල";
+    await sendWhatsApp(supabaseUrl, supabaseServiceKey, phoneNumber, fallbackText, null, sessionApiKey);
+    await supabase.from("conversations").insert({
+      phone_number: phoneNumber,
+      message: fallbackText,
+      direction: "outbound",
+      message_type: "text",
+      metadata: { type: "language_prompt_fallback", correlationId: corrId },
+      user_id: userId,
+    });
   }
   mark("send_end");
 
@@ -486,8 +527,35 @@ async function handleWelcomeMessage(
     console.log(`[${corrId}] Stored ${sentTexts.length} welcome message(s) in conversation history`);
   }
 
-  console.log(`[${corrId}] Welcome message sent, skipping AI for first message`);
+  console.log(`[${corrId}] Welcome sequence and language poll sent, skipping AI for first message`);
   return true;
+}
+
+async function sendWhatsAppPoll(
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  to: string,
+  poll: { name: string; options: string[]; multipleAnswers?: boolean },
+  sessionApiKey: string
+) {
+  const body = { to, poll, sessionApiKey };
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/send-whatsapp_via_cloth`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${supabaseServiceKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Send WhatsApp poll error:", errText);
+    throw new Error(`Send WhatsApp poll failed: ${errText.substring(0, 200)}`);
+  } else {
+    console.log("Language poll sent successfully");
+  }
 }
 
 async function sendWhatsApp(

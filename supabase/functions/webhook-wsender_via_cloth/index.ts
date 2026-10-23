@@ -64,16 +64,22 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders });
     }
 
-    if (event !== "message" && event !== "message.any") {
+    const isPollVote = event === "poll.vote";
+    if (event !== "message" && event !== "message.any" && !isPollVote) {
       console.log(`[${correlationId}] Ignoring event: ${event}`);
       return new Response(JSON.stringify({ ok: true, skipped: event }), { headers: jsonHeaders });
     }
 
-    if (wp?.fromMe === true) {
+    if (wp?.fromMe === true || wp?.vote?.fromMe === true) {
       return new Response(JSON.stringify({ ok: true, skipped: "fromMe" }), { headers: jsonHeaders });
     }
 
-    const fromJid = String(wp.from || wp._data?.key?.remoteJid || "");
+    const fromJid = String(
+      (isPollVote ? (wp.vote?.from || wp.vote?.voter || wp._data?.voter) : null)
+      || wp.from
+      || wp._data?.key?.remoteJid
+      || ""
+    );
     if (/@g\.us$/i.test(fromJid) || /@broadcast$/i.test(fromJid) || /@newsletter$/i.test(fromJid)) {
       return new Response(JSON.stringify({ ok: true, skipped: "non_individual" }), { headers: jsonHeaders });
     }
@@ -114,15 +120,28 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "No phone number" }), { status: 400, headers: jsonHeaders });
     }
 
-
-    // Text body — WAHA usually puts it on payload.body
-    const messageText = wp.body
-      || wp._data?.message?.conversation
-      || wp._data?.message?.extendedTextMessage?.text
-      || "";
+    // Text body — derive from poll vote options or message body
+    let messageText = "";
+    if (isPollVote) {
+      const selected = wp.vote?.selectedOptions || wp._data?.vote?.selectedOptions || [];
+      const optionNames = Array.isArray(selected)
+        ? selected.map((s: any) => (typeof s === "string" ? s : s?.name || "")).filter(Boolean)
+        : [];
+      messageText = optionNames.join(", ");
+      if (!messageText) {
+        console.log(`[${correlationId}] Poll vote has no selected options, skipping`);
+        return new Response(JSON.stringify({ ok: true, skipped: "empty_vote" }), { headers: jsonHeaders });
+      }
+      console.log(`[${correlationId}] Received poll vote: "${messageText}" from ${fromJid}`);
+    } else {
+      messageText = wp.body
+        || wp._data?.message?.conversation
+        || wp._data?.message?.extendedTextMessage?.text
+        || "";
+    }
 
     // Message type — derive from WAHA `type` or `_data.message.*` keys
-    let messageType = wp.type || "text";
+    let messageType = isPollVote ? "poll_vote" : (wp.type || "text");
     if (messageType === "chat") messageType = "text";
     
     const wMsg = wp._data?.message || {};
@@ -135,7 +154,9 @@ serve(async (req) => {
     else if (wp.hasMedia && !messageText && messageType === "text") messageType = "image";
 
     const senderName = wp._data?.pushName || wp._data?.notifyName || wp.notifyName || "Unknown";
-    const wahaMessageId = wp.id || wp._data?.key?.id || `${phoneNumber}-${Date.now()}`;
+    const wahaMessageId = isPollVote
+      ? `${wp.vote?.id || "vote"}-${phoneNumber}-${Date.now()}`
+      : (wp.id || wp._data?.key?.id || `${phoneNumber}-${Date.now()}`);
 
     if (!userId) {
       console.error(`[${correlationId}] No user mapped to WAHA session "${sessionName}"`);
