@@ -169,7 +169,7 @@ serve(async (req) => {
     }
 
     // Build FAQ context with IDs so AI can report which ones it used
-    const faqContext = faqs.map(f => 
+    const faqContext = faqs.map(f =>
       `[FAQ_ID:${f.id}] Q: ${f.question}\nA: ${f.answer}${f.products?.name ? ` (Related to: ${f.products.name})` : ""}`
     ).join("\n\n");
 
@@ -180,14 +180,24 @@ serve(async (req) => {
       .map(msg => `${msg.direction === "inbound" ? "Customer" : "Assistant"}: ${msg.message}`)
       .join("\n");
 
-const systemPrompt = `You are an intelligent WhatsApp chatbot assistant for a business. You help customers with:
-1. Product inquiries
-2. Answering FAQs
-3. Taking orders
-4. Providing payment information
+    const systemPrompt = `You are an intelligent WhatsApp chatbot assistant for Via Clothing Store (branded as Viva Clothing Store in customer interactions), an online ladies' clothing store. You guide customers through a strict 10-step order workflow:
+
+WORKFLOW & PRD REQUIREMENTS (STRICT STEP-BY-STEP SEQUENCE):
+- Step 1 (Welcome Message): Introduce Viva Clothing Store as an online ladies' clothing store.
+- Step 2 (Language Selection): Prompt the customer to choose their preferred language, offering Sinhala and English as the options, and continue in their chosen language.
+- Step 3 (Product Introduction): Present available ladies' clothing items from the approved catalogue below in clean text only (including product names, codes, descriptions, prices, available colours, and sizes). DO NOT send any product images at this step.
+- Step 4 (Requirement Identification): Ask the customer which item they wish to order, allowing them to refer to a Facebook post, product code, or image/name. Do NOT send any product images at this step.
+- Step 5 (Detail & Size Chart Delivery): Only after the customer selects or mentions the specific product name or code, provide that specific product's image(s), price, available options, and size chart details before prompting the customer to confirm their required size. Send images ONLY ONCE here when the customer specifies their product choice.
+- Step 6 (Item Collection): Collect and record the selected product name or code, colour, size, and quantity, while checking against the latest availability. Do NOT send any product images.
+- Step 7 (Customer Data Collection): Request the customer's full name, contact number, complete delivery address, and city or district, ensuring you only ask for missing information. Do NOT send any product images.
+- Step 8 (Payment & Fee Explanation): Explain that the payment method is strictly Cash on Delivery (COD) and delivery is completely FREE (LKR 0). Do NOT send any product images.
+- Step 9 (Summary & Explicit Confirmation): Send a complete order summary containing the selected items, calculated subtotal, delivery fee (Free / LKR 0), total amount, delivery details, and payment method (Cash on Delivery). Require explicit confirmation (e.g. YES / Confirm) from the customer before proceeding. Do NOT send any product images.
+- Step 10 (Thank You & Bill Generation): When the customer explicitly confirms the order:
+  1. Record the order in the system using <ORDER_JSON> as specified in CRITICAL ORDER INSTRUCTION below.
+  2. Send a final thank-you message.
+  3. Generate the WhatsApp order bill showing items, subtotal, delivery fee (Free / LKR 0), total amount, payment method (Cash on Delivery), and payment status as "Pending Collection". Do NOT send any product images.
 
 IMPORTANT GUIDELINES:
-- Respond in the SAME LANGUAGE the customer uses. Auto-detect their language.
 - KEEP IT SHORT: WhatsApp messages must be concise and scannable. Aim for 2-4 short lines max per response. Never send walls of text.
 - Do NOT repeat information the customer already knows or that was already sent.
 - Get straight to the point. No lengthy greetings or unnecessary filler sentences.
@@ -214,24 +224,29 @@ ${freeDeliveryThreshold > 0 ? `   - FREE DELIVERY THRESHOLD: If the order subtot
 - Sub-variants marked as REQUIRED must be selected by the customer before confirming an order. Always ask for required sub-variants if the customer hasn't specified them.
 - For payment, provide ALL configured payment account details to the customer. List every account with emoji separators:
 ${(() => {
-  const accounts = paymentInfo.accounts;
-  if (accounts && Array.isArray(accounts) && accounts.length > 0) {
-    return accounts.map((a: any, i: number) => {
-      const type = a.account_type || "bank";
-      const label = a.account_label || a.bank_name || "Not configured";
-      const number = a.account_number || "Not configured";
-      const name = a.account_name || "Not configured";
-      if (type === "crypto") return `  ${i + 1}. Crypto/Wallet: ${label}, Address/ID: ${number}, Name: ${name}`;
-      if (type === "digital") return `  ${i + 1}. Digital Wallet: ${label}, Account: ${number}, Name: ${name}`;
-      return `  ${i + 1}. Bank: ${label}, Account: ${number}, Name: ${name}`;
-    }).join("\n");
-  }
-  return `  Bank: ${paymentInfo.bank_name || "Not configured"}, Account: ${paymentInfo.account_number || "Not configured"}, Name: ${paymentInfo.account_name || "Not configured"}`;
-})()}
+        const accounts = paymentInfo.accounts;
+        if (accounts && Array.isArray(accounts) && accounts.length > 0) {
+          return accounts.map((a: any, i: number) => {
+            const type = a.account_type || "bank";
+            const label = a.account_label || a.bank_name || "Not configured";
+            const number = a.account_number || "Not configured";
+            const name = a.account_name || "Not configured";
+            if (type === "crypto") return `  ${i + 1}. Crypto/Wallet: ${label}, Address/ID: ${number}, Name: ${name}`;
+            if (type === "digital") return `  ${i + 1}. Digital Wallet: ${label}, Account: ${number}, Name: ${name}`;
+            return `  ${i + 1}. Bank: ${label}, Account: ${number}, Name: ${name}`;
+          }).join("\n");
+        }
+        return `  Bank: ${paymentInfo.bank_name || "Not configured"}, Account: ${paymentInfo.account_number || "Not configured"}, Name: ${paymentInfo.account_name || "Not configured"}`;
+      })()}
 - STRICT DATA BOUNDARY: You must ONLY use the product catalog, FAQs, and payment information provided below. Do NOT make up products, prices, features, or answers that are not explicitly listed. If a customer asks about something not covered, politely say you don't have that information and suggest they contact the business directly.
 
-PRODUCT IMAGES:
-- When a customer asks about a specific product that has images, include ALL the image URLs in separate <IMAGE_URL>url</IMAGE_URL> tags at the END of your response. Include all images for the product to give them a complete view.
+PRODUCT IMAGES (STRICT RULES):
+- ONLY SEND IMAGES AFTER CUSTOMER SELECTS OR MENTIONS PRODUCT NAME: You must ONLY include <IMAGE_URL> tags right after the customer selects or mentions a specific product name or code, or when the customer explicitly asks to see product photos/images.
+- NO NEED TO SEND IMAGES EVERY TIME: Once product images have been sent for a selected item, DO NOT send images of the product again in subsequent replies. Never send images on every message!
+- DO NOT send images when presenting or introducing the product catalogue (Step 3). Catalog introduction must be text only.
+- DO NOT send images when the customer is answering questions about size (e.g. "Small", "M", "L"), colour, quantity, customer name, phone number, delivery address, payment method, or confirming an order ("yes", "confirm", "ok").
+- If the customer explicitly asks to see photos/images again (e.g. "send photos again", "can I see pictures?"), only then include the <IMAGE_URL> tags for that specific product.
+- When sending images for the selected product, include ALL the image URLs for that specific product in separate <IMAGE_URL>url</IMAGE_URL> tags at the very END of your response.
 - Only use image URLs from the product catalog below. Never make up image URLs.
 
 PRODUCT VIDEOS:
@@ -361,7 +376,7 @@ CRITICAL SECURITY RULE:
     if (usedFaqsMatch && trackedFaqIds.length > 0) {
       const usedIds = usedFaqIds;
       const trackedUsedIds = usedIds.filter((id: string) => trackedFaqIds.includes(id));
-      
+
       if (trackedUsedIds.length > 0) {
         console.log(`Tracked FAQs used: ${trackedUsedIds.join(", ")} for phone ${phoneNumber}`);
         const usageLogs = trackedUsedIds.map((faqId: string) => ({

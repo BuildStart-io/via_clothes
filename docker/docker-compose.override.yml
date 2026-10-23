@@ -19,7 +19,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_REGION: ${MINIO_REGION}
       FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
-      WEBHOOK_URL_OVERRIDE: "https://tsunami-valuation-satisfy-mins.trycloudflare.com/functions/v1/webhook-wsender_via_cloth"
+      WEBHOOK_URL_OVERRIDE: "https://silent-bloggers-hence-key.trycloudflare.com/functions/v1/webhook-wsender_via_cloth"
       SUPABASE_SCHEMA: "via_clothing"
 
   waha:
