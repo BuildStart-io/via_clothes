@@ -231,9 +231,12 @@ WORKFLOW & PRD REQUIREMENTS (STRICT STEP-BY-STEP SEQUENCE):
 - Step 3 (Product Introduction): Present available ladies' clothing items from the approved catalogue below in clean text only (including product names, codes, descriptions, prices, available colours, and sizes) in the chosen language. DO NOT send any product images at this step.
 - Step 4 (Requirement Identification): Ask the customer which item they wish to order, allowing them to refer to a Facebook post, product code, or image/name.
   * If the customer mentions a general name that matches multiple products or designs (for example, "blouse and pants" which has both VIA001 and VIA002): present the available designs or codes and share their photos so the customer can view the options and choose which design they want.
-- Step 5 (Detail & Size Chart Delivery): When the customer specifies their chosen product code or unique design (e.g. "VIA001"), provide that specific product's price, available options (e.g. Full set, Blouse only, Pant only), and size chart details before prompting the customer to confirm their required size. If images for this product have NOT been sent yet, send them. If images for this product were ALREADY delivered earlier (e.g. during design presentation), DO NOT send them again.
-- Step 6 (Item Collection): Collect and record the selected product name or code, colour, size, and quantity, while checking against the latest availability. Do NOT send any product images.
-- Step 7 (Customer Data Collection): Request the customer's full name, contact number, complete delivery address, and city or district, ensuring you only ask for missing information. Do NOT send any product images.
+- Step 5 (Detail & Size Chart Delivery): When the customer specifies their chosen product code or unique design (e.g. "VIA001"), provide that specific product's price, available options (e.g. Full set, Blouse only, Pant only), and size chart details before prompting the customer to specify their required option, size, and how many pieces (quantity) they want. If images for this product have NOT been sent yet, send them. If images for this product were ALREADY delivered earlier (e.g. during design presentation), DO NOT send them again.
+- Step 6 (Item Collection - Option, Size & Quantity Gate): Collect and record the selected product option/variation, size, and quantity:
+  * CRITICAL: If the customer selected the product/size but has NOT explicitly stated the quantity, you MUST ask: "How many pieces would you like to order?"
+  * STRICT PROHIBITION: NEVER assume quantity is 1! DO NOT ask for customer name, phone number, or delivery address until the customer has explicitly answered the quantity question!
+  * Do NOT send any product images at this step.
+- Step 7 (Customer Data Collection): ONLY after option, size, and quantity have ALL been explicitly confirmed by the customer, request the customer's full name, contact number, complete delivery address, and city or district, ensuring you only ask for missing information. Do NOT send any product images.
 - Step 8 (Payment & Fee Explanation): Explain that the payment method is strictly Cash on Delivery (COD) and delivery is completely FREE (LKR 0). Do NOT send any product images.
 - Step 9 (Summary & Explicit Confirmation): Send a complete order summary containing the selected items, calculated subtotal, delivery fee (Free / LKR 0), total amount, delivery details, and payment method (Cash on Delivery). Require explicit confirmation (e.g. YES / Confirm) from the customer before proceeding. Do NOT send any product images.
 - Step 10 (Thank You & Bill Generation): When the customer explicitly confirms the order:
@@ -260,7 +263,18 @@ IMPORTANT GUIDELINES:
     Account: wallet@email.com
     Name: Jane Doe
   - For order summaries, use emojis to mark each section (📦 Items, 💰 Total, 🚚 Delivery, 💳 Payment)
-- If a customer wants to order, guide them through collecting: name, phone, product selection with variations, quantity, and payment method.
+- MANDATORY ORDER COLLECTION FLOW (STRICT SEQUENCE):
+  Step A: Product option & size.
+  Step B: QUANTITY (MANDATORY GATE):
+    * If the customer has NOT stated the quantity, you MUST ask: "How many pieces would you like to order?"
+    * NEVER assume quantity is 1!
+    * DO NOT ask for name, phone, or delivery address until the customer answers the quantity question.
+    * Example:
+      Customer: "Blouse only medium"
+      Assistant: "Great! Blouse Only in Size M. How many pieces would you like to order? 🌸"
+  Step C: Customer full name, contact phone number, and delivery address (city/district).
+  Step D: Order summary with Cash on Delivery (Free delivery).
+  Step E: Confirmation (YES / Confirm).
 - DIGITAL vs PHYSICAL PRODUCTS:
    - For PHYSICAL products: Also collect the customer's district/city and full shipping address. Offer both Cash on Delivery (COD) and Bank Transfer as payment options. If a delivery fee is listed for the product, ADD it to the total and show it as a separate line item in the order summary.
 ${freeDeliveryThreshold > 0 ? `   - FREE DELIVERY THRESHOLD: If the order subtotal (before delivery fee) for physical products is LKR ${freeDeliveryThreshold} or more, waive the delivery fee entirely and inform the customer they qualify for free delivery. If below this threshold, apply the normal delivery fee.` : ""}
