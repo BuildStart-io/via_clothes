@@ -118,7 +118,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const schema = Deno.env.get("SUPABASE_SCHEMA") || "via_clothing";
+    const schema = "via_clothing";
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema } });
 
     // Identify the calling user from the JWT (token already verified by gateway = false; we self-check)
@@ -129,6 +129,7 @@ serve(async (req) => {
     }
     const authClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
+      db: { schema },
     });
     const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
     if (claimsError || !claimsData?.claims?.sub) {
@@ -141,7 +142,11 @@ serve(async (req) => {
 
     // WAHA session name locked to the user — slug-safe, deterministic, fits within ~25 chars.
     const sessionName = `u_${userId.replace(/-/g, "").substring(0, 20)}`;
-    const webhookUrl = Deno.env.get("WEBHOOK_URL_OVERRIDE") || `${supabaseUrl}/functions/v1/webhook-wsender_via_cloth`;
+    let override = Deno.env.get("WEBHOOK_URL_OVERRIDE");
+    if (override && !override.includes("_via_cloth")) {
+      override = override.replace("webhook-wsender", "webhook-wsender_via_cloth");
+    }
+    const webhookUrl = override || `${supabaseUrl}/functions/v1/webhook-wsender_via_cloth`;
 
     // Helper: store/update mapping in user_wsender_sessions
     const upsertMapping = async (displayName?: string) => {

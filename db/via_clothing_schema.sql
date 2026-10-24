@@ -218,7 +218,8 @@ CREATE FUNCTION via_clothing.handle_new_user() RETURNS trigger
     AS $$
 BEGIN
   INSERT INTO via_clothing.profiles (user_id, email, full_name)
-  VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email));
+  VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email))
+  ON CONFLICT (user_id) DO NOTHING;
   RETURN NEW;
 END;
 $$;
@@ -236,7 +237,8 @@ CREATE FUNCTION via_clothing.handle_new_user_role() RETURNS trigger
     AS $$
 BEGIN
   INSERT INTO via_clothing.user_roles (user_id, role)
-  VALUES (NEW.id, 'business_user');
+  VALUES (NEW.id, 'business_user')
+  ON CONFLICT (user_id, role) DO NOTHING;
   RETURN NEW;
 END;
 $$;
@@ -256,7 +258,8 @@ BEGIN
   INSERT INTO via_clothing.settings (user_id, key, value) VALUES
     (NEW.id, 'welcome_message', '{"text": "Welcome! How can I help you today?"}'::jsonb),
     (NEW.id, 'payment_info', '{"bank_name": "", "account_number": "", "account_name": ""}'::jsonb),
-    (NEW.id, 'auto_responses', '{"enabled": true}'::jsonb);
+    (NEW.id, 'auto_responses', '{"enabled": true}'::jsonb)
+  ON CONFLICT (user_id, key) DO NOTHING;
   RETURN NEW;
 END;
 $$;
@@ -2253,21 +2256,94 @@ INSERT INTO via_clothing.platform_settings (key, value)
 SELECT key, value FROM public.platform_settings
 ON CONFLICT (key) DO NOTHING;
 
--- Seed existing profiles, roles, and settings
-INSERT INTO via_clothing.profiles (id, user_id, email, full_name, plan_tier, billing_cycle_start, is_active, is_paused)
-SELECT id, user_id, email, full_name, plan_tier::text::via_clothing.plan_tier, billing_cycle_start, is_active, is_paused
-FROM public.profiles
-ON CONFLICT (user_id) DO NOTHING;
+--
+-- Name: broadcast_campaigns; Type: TABLE; Schema: via_clothing; Owner: postgres
+--
 
-INSERT INTO via_clothing.user_roles (id, user_id, role)
-SELECT id, user_id, role::text::via_clothing.app_role
-FROM public.user_roles
-ON CONFLICT (user_id, role) DO NOTHING;
+CREATE TABLE via_clothing.broadcast_campaigns (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    name text DEFAULT 'Promotional Broadcast'::text NOT NULL,
+    title text DEFAULT 'Promotional Broadcast'::text NOT NULL,
+    segment text DEFAULT 'all'::text NOT NULL,
+    audience_filter text DEFAULT 'all'::text NOT NULL,
+    message text,
+    message_template text,
+    media_url text,
+    media_type text,
+    total_recipients integer DEFAULT 0 NOT NULL,
+    total_count integer DEFAULT 0 NOT NULL,
+    sent_count integer DEFAULT 0 NOT NULL,
+    failed_count integer DEFAULT 0 NOT NULL,
+    status text DEFAULT 'draft'::text NOT NULL,
+    delay_seconds integer DEFAULT 10 NOT NULL,
+    delay_seconds_min integer DEFAULT 8 NOT NULL,
+    delay_seconds_max integer DEFAULT 15 NOT NULL,
+    batch_size integer DEFAULT 30 NOT NULL,
+    batch_cooldown_seconds integer DEFAULT 120 NOT NULL,
+    started_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT broadcast_campaigns_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'sending'::text, 'in_progress'::text, 'completed'::text, 'paused'::text, 'cancelled'::text, 'failed'::text])))
+);
 
-INSERT INTO via_clothing.settings (id, user_id, key, value)
-SELECT id, user_id, key, value
-FROM public.settings
-ON CONFLICT DO NOTHING;
+ALTER TABLE via_clothing.broadcast_campaigns OWNER TO postgres;
+
+--
+-- Name: broadcast_queue; Type: TABLE; Schema: via_clothing; Owner: postgres
+--
+
+CREATE TABLE via_clothing.broadcast_queue (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    campaign_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    phone_number text NOT NULL,
+    customer_name text,
+    recipient_name text,
+    status text DEFAULT 'pending'::text NOT NULL,
+    error_message text,
+    retry_count integer DEFAULT 0 NOT NULL,
+    sent_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT broadcast_queue_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'sending'::text, 'sent'::text, 'failed'::text])))
+);
+
+ALTER TABLE via_clothing.broadcast_queue OWNER TO postgres;
+
+ALTER TABLE ONLY via_clothing.broadcast_campaigns
+    ADD CONSTRAINT broadcast_campaigns_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY via_clothing.broadcast_queue
+    ADD CONSTRAINT broadcast_queue_pkey PRIMARY KEY (id);
+
+CREATE INDEX idx_via_clothing_broadcast_campaigns_user_id ON via_clothing.broadcast_campaigns USING btree (user_id);
+CREATE INDEX idx_via_clothing_broadcast_queue_campaign_id ON via_clothing.broadcast_queue USING btree (campaign_id);
+CREATE INDEX idx_via_clothing_broadcast_queue_status ON via_clothing.broadcast_queue USING btree (status);
+CREATE INDEX idx_via_clothing_broadcast_queue_user_id ON via_clothing.broadcast_queue USING btree (user_id);
+
+ALTER TABLE ONLY via_clothing.broadcast_campaigns
+    ADD CONSTRAINT broadcast_campaigns_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY via_clothing.broadcast_queue
+    ADD CONSTRAINT broadcast_queue_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES via_clothing.broadcast_campaigns(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY via_clothing.broadcast_queue
+    ADD CONSTRAINT broadcast_queue_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE via_clothing.broadcast_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE via_clothing.broadcast_queue ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own broadcast campaigns" ON via_clothing.broadcast_campaigns USING ((auth.uid() = user_id)) WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can manage own broadcast queue" ON via_clothing.broadcast_queue USING ((auth.uid() = user_id)) WITH CHECK ((auth.uid() = user_id));
+
+GRANT ALL ON TABLE via_clothing.broadcast_campaigns TO anon;
+GRANT ALL ON TABLE via_clothing.broadcast_campaigns TO authenticated;
+GRANT ALL ON TABLE via_clothing.broadcast_campaigns TO service_role;
+
+GRANT ALL ON TABLE via_clothing.broadcast_queue TO anon;
+GRANT ALL ON TABLE via_clothing.broadcast_queue TO authenticated;
+GRANT ALL ON TABLE via_clothing.broadcast_queue TO service_role;
 
 -- Grants
 GRANT ALL ON SCHEMA via_clothing TO postgres, anon, authenticated, service_role, supabase_admin;

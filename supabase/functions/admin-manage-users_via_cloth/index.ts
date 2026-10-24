@@ -32,6 +32,7 @@ serve(async (req) => {
     // Use getClaims for JWT validation (works with ES256 signing on Lovable Cloud)
     const authClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
+      db: { schema },
     });
     const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
     if (claimsError || !claimsData?.claims?.sub) {
